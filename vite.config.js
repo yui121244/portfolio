@@ -19,6 +19,7 @@ function projectPageEntries() {
 }
 
 export default defineConfig({
+  base: '/portfolio/',
   plugins: [react(), projectPageEntries()],
   server: { host: '127.0.0.1' },
   build: { target: 'es2020' },
