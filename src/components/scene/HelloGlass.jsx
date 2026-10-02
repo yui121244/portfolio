@@ -127,7 +127,7 @@ export default function HelloGlass({ active, heroExitProgressRef, onReady, phase
   const feedbackInitialized = useRef(false)
   const data = useHelloGeometry()
   const size = useThree((state) => state.size)
-  const viewportWidth = useThree((state) => state.viewport.width)
+  const viewport = useThree((state) => state.viewport)
   const camera = useThree((state) => state.camera)
   const fbo = useFBO({ samples: 0, depthBuffer: true, stencilBuffer: false })
   const currentHelloFbo = useFBO({
@@ -162,8 +162,14 @@ export default function HelloGlass({ active, heroExitProgressRef, onReady, phase
     uDisplacement: { value: null },
     uAspect: { value: 1 },
   }), [])
-  const scale = size.width < 900
-    ? Math.min(0.0088, viewportWidth * 0.86 / (data.geometry.boundingBox.max.x - data.geometry.boundingBox.min.x))
+  const bounds = data.geometry.boundingBox
+  // Fit the mobile canvas, not the desktop model scale. The height limit
+  // leaves room for the existing float even in a short landscape banner.
+  const scale = size.width <= 900
+    ? Math.min(
+      viewport.width * 0.88 / (bounds.max.x - bounds.min.x),
+      viewport.height * 0.78 / (bounds.max.y - bounds.min.y),
+    )
     : size.height <= 760
       ? 0.0123
       : 0.01184
