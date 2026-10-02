@@ -127,6 +127,7 @@ export default function HelloGlass({ active, heroExitProgressRef, onReady, phase
   const feedbackInitialized = useRef(false)
   const data = useHelloGeometry()
   const size = useThree((state) => state.size)
+  const viewportWidth = useThree((state) => state.viewport.width)
   const camera = useThree((state) => state.camera)
   const fbo = useFBO({ samples: 0, depthBuffer: true, stencilBuffer: false })
   const currentHelloFbo = useFBO({
@@ -162,7 +163,7 @@ export default function HelloGlass({ active, heroExitProgressRef, onReady, phase
     uAspect: { value: 1 },
   }), [])
   const scale = size.width < 900
-    ? 0.0088
+    ? Math.min(0.0088, viewportWidth * 0.86 / (data.geometry.boundingBox.max.x - data.geometry.boundingBox.min.x))
     : size.height <= 760
       ? 0.0123
       : 0.01184

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { ENTRANCE_PHASE } from '../../lib/entranceTimeline'
 import { scrollToPagePosition } from '../../lib/scrollCommands'
+import { useMobileLayout } from '../../lib/useMobileLayout'
 import {
   formatCoordinate,
   getPointerServerSnapshot,
@@ -59,7 +60,9 @@ function handleSectionLink(event) {
   if (!target) return
 
   event.preventDefault()
-  const targetTop = target.getBoundingClientRect().top + window.scrollY
+  // Match native anchor positioning for compact sections under the fixed header.
+  const scrollMargin = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0
+  const targetTop = target.getBoundingClientRect().top + window.scrollY - scrollMargin
   scrollToPagePosition(targetTop, {
     onComplete: () => window.history.replaceState(null, '', hash),
   })
@@ -70,16 +73,77 @@ export default function GlobalChrome({
   phase,
   sectionHrefPrefix = '',
 }) {
+  const headerRef = useRef(null)
+  const navigationRef = useRef(null)
+  const isMobile = useMobileLayout()
   const active = phase === ENTRANCE_PHASE.SCENE_ENTER
     || phase === ENTRANCE_PHASE.TEXT_DECODE
     || phase === ENTRANCE_PHASE.READY
 
+  useEffect(() => {
+    if (!isMobile) return
+    const header = headerRef.current
+    const navigation = navigationRef.current
+    if (!header || !navigation) return
+
+    // Ignore elastic overscroll outside the page so edge bounce cannot flip
+    // the menu direction. Keep transient tracking outside React render state.
+    const readScrollY = () => Math.max(0, Math.min(
+      window.scrollY,
+      document.documentElement.scrollHeight - window.innerHeight,
+    ))
+    let lastScrollY = readScrollY()
+    let direction = 0
+    let directionDistance = 0
+    let hidden = false
+    const setHidden = (nextHidden) => {
+      if (hidden === nextHidden) return
+      hidden = nextHidden
+      header.dataset.scrolling = String(nextHidden)
+      navigation.dataset.scrolling = String(nextHidden)
+      navigation.inert = nextHidden
+    }
+    const handleScroll = () => {
+      const scrollY = readScrollY()
+      const delta = scrollY - lastScrollY
+      lastScrollY = scrollY
+      if (scrollY === 0) {
+        direction = 0
+        directionDistance = 0
+        setHidden(false)
+        return
+      }
+      if (delta === 0) return
+
+      const nextDirection = Math.sign(delta)
+      directionDistance = nextDirection === direction
+        ? directionDistance + Math.abs(delta)
+        : Math.abs(delta)
+      direction = nextDirection
+
+      // Finger up (page offset increases): collapse and stay collapsed at rest.
+      // Finger down: reveal. A small travel threshold filters scroll jitter.
+      if (directionDistance >= 6) {
+        setHidden(direction > 0)
+        directionDistance = 0
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      delete header.dataset.scrolling
+      delete navigation.dataset.scrolling
+      navigation.inert = false
+    }
+  }, [isMobile])
+
   return (
     <div className="global-chrome" data-scene-active={active}>
       <GlobalGrid />
-      <header className="site-header">
+      <header ref={headerRef} className="site-header">
         <a className="site-mark" href={homeHref} onClick={handleSectionLink} aria-label="Pengyang Design, home">PENGYANG.DESIGN</a>
-        <nav className="site-nav" aria-label="Primary navigation">
+        <nav ref={navigationRef} className="site-nav" aria-label="Primary navigation">
           <a href={`${sectionHrefPrefix}#about`} onClick={handleSectionLink}>关于我</a>
           <a href={`${sectionHrefPrefix}#projects`} onClick={handleSectionLink}>项目经历</a>
           <a href={`${sectionHrefPrefix}#work`} onClick={handleSectionLink}>工作经历</a>

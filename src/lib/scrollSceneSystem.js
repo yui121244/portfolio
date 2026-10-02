@@ -62,6 +62,8 @@ function setLayerMotion(element, { blur = 0, opacity = 1, scale = 1, y = 0 }) {
 }
 
 function renderExperienceScene(scene, progress, entryProgress) {
+  // Both layouts share the horizontal scene; mobile only changes the pair's layout.
+  scene.style.removeProperty('--experience-progress')
   const firstSlide = progressBetween(progress, 0.24, 0.42)
   const secondSlide = progressBetween(progress, 0.6, 0.78)
   const experienceTrack = scene.querySelector('.experience-track')
@@ -261,7 +263,10 @@ export function createScrollSceneController() {
       const target = isStickyProgress
         ? clamp01(-bounds.top / Math.max(bounds.height - safeViewportHeight, 1))
         : clamp01((safeViewportHeight - bounds.top) / Math.max(bounds.height, 1))
-      const entryTarget = clamp01((safeViewportHeight - bounds.top) / safeViewportHeight)
+      // Compact scenes must finish revealing when fully visible, even when
+      // the final section is shorter than the viewport and cannot scroll higher.
+      const entryDistance = Math.max(Math.min(bounds.height, safeViewportHeight), 1)
+      const entryTarget = clamp01((safeViewportHeight - bounds.top) / entryDistance)
       let state = sceneStates.get(scene)
       if (!state) {
         state = { entryTarget, entryVisual: entryTarget, target, visual: target, viewportHeight: safeViewportHeight }

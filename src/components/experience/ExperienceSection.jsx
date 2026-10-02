@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { scrollToPagePosition } from '../../lib/scrollCommands'
 import { ScrollScene, ScrollSceneViewport } from '../motion/ScrollScene'
+import { useMobileLayout } from '../../lib/useMobileLayout'
 
 const EXPERIENCES = Object.freeze([
   {
@@ -62,9 +63,9 @@ const EXPERIENCE_PAIRS = Object.freeze([
 ])
 
 const NODE_PROGRESS = Object.freeze([0.04, 0.22, 0.42, 0.63, 0.83, 1])
-function ExperienceItem({ experience, focused, itemIndex }) {
+function ExperienceItem({ experience, focused, itemIndex, ...props }) {
   return (
-    <article className="experience-card" data-experience-card data-experience-card-index={itemIndex} data-focused={focused || undefined}>
+    <article className="experience-card" data-experience-card data-experience-card-index={itemIndex} data-focused={focused || undefined} {...props}>
       <div className="experience-card__text" data-experience-text>
         <div className="experience-card__year-block">
           <h3>{experience.year}</h3>
@@ -95,7 +96,122 @@ function ExperienceItem({ experience, focused, itemIndex }) {
   )
 }
 
+function ExperienceTimeline({ activeIndex, hoveredIndex, onHover, onSelect }) {
+  return (
+    <nav className="experience-timeline" data-experience-timeline aria-label="按年份选择工作经历">
+      <span className="experience-timeline__line" aria-hidden="true">
+        <span className="experience-timeline__line-progress" />
+      </span>
+      <ol>
+        {EXPERIENCES.map((experience, index) => (
+          <li key={experience.year} style={{ '--node-threshold': index / (EXPERIENCES.length - 1) }}>
+            <button
+              className="experience-timeline__node"
+              data-hovered={hoveredIndex === index || undefined}
+              onClick={() => onSelect(index)}
+              onMouseEnter={() => onHover?.(index)}
+              onMouseLeave={() => onHover?.(-1)}
+              onPointerMove={() => onHover?.(index)}
+              type="button"
+              aria-current={activeIndex === index ? 'step' : undefined}
+              aria-controls={activeIndex === undefined ? undefined : `mobile-experience-${experience.year}`}
+              aria-label={`查看 ${experience.year} 年 ${experience.company} 工作经历`}
+            >
+              <span className="experience-timeline__year">
+                <span>{experience.year}</span>
+                <span className="experience-timeline__year-active" aria-hidden="true">{experience.year}</span>
+              </span>
+              <span className="experience-timeline__dot" aria-hidden="true"><span /></span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+
+function MobileExperienceSection() {
+  const sceneRef = useRef(null)
+  const sliderRef = useRef(null)
+  const activeIndexRef = useRef(0)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  const selectExperience = useCallback((index, behavior = 'smooth') => {
+    const slider = sliderRef.current
+    const card = slider?.children[index]
+    if (!card) return
+    slider.scrollTo({
+      left: card.offsetLeft - slider.firstElementChild.offsetLeft,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : behavior,
+    })
+  }, [])
+
+  // Preserve the selected year after rotation without moving the page vertically.
+  useEffect(() => {
+    const observer = new ResizeObserver(() => selectExperience(activeIndexRef.current, 'instant'))
+    observer.observe(sliderRef.current)
+    return () => observer.disconnect()
+  }, [selectExperience])
+
+  const handleScroll = (event) => {
+    const slider = event.currentTarget
+    const stride = slider.children[1].offsetLeft - slider.children[0].offsetLeft
+    const progress = Math.max(0, Math.min(slider.scrollLeft / stride, EXPERIENCES.length - 1))
+    sceneRef.current.style.setProperty('--experience-progress', String(progress / (EXPERIENCES.length - 1)))
+    const nextIndex = Math.round(progress)
+    if (nextIndex !== activeIndexRef.current) {
+      activeIndexRef.current = nextIndex
+      setActiveIndex(nextIndex)
+    }
+  }
+
+  return (
+    <section className="experience-scroll-scene experience-mobile" id="work" ref={sceneRef} aria-labelledby="experience-heading">
+      <div className="experience-sticky">
+        <h2 className="experience-heading" id="experience-heading">
+          <span>工作经历</span>
+          <span className="experience-heading__secondary mono">/ EXPERIENCE</span>
+        </h2>
+        <ExperienceTimeline activeIndex={activeIndex} onSelect={selectExperience} />
+        <div className="experience-content">
+          <div
+            className="experience-mobile-slider"
+            ref={sliderRef}
+            onScroll={handleScroll}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+              event.preventDefault()
+              selectExperience(Math.max(0, Math.min(activeIndexRef.current + (event.key === 'ArrowRight' ? 1 : -1), EXPERIENCES.length - 1)))
+            }}
+            role="region"
+            aria-roledescription="轮播"
+            aria-label="工作经历详情，左右滑动切换年份"
+            tabIndex={0}
+          >
+            {EXPERIENCES.map((experience, index) => (
+              <ExperienceItem
+                experience={experience}
+                itemIndex={index}
+                key={experience.year}
+                id={`mobile-experience-${experience.year}`}
+                role="group"
+                aria-roledescription="幻灯片"
+                aria-label={`${index + 1} / ${EXPERIENCES.length}：${experience.year} ${experience.company}`}
+                aria-hidden={index !== activeIndex}
+              />
+            ))}
+          </div>
+        </div>
+        <p aria-live="polite" aria-atomic="true" className="visually-hidden">
+          {EXPERIENCES[activeIndex].year} 年，{EXPERIENCES[activeIndex].company}
+        </p>
+      </div>
+    </section>
+  )
+}
+
 export default function ExperienceSection() {
+  const isMobile = useMobileLayout()
   const sceneRef = useRef(null)
   const focusTimerRef = useRef(0)
   const [focusedIndex, setFocusedIndex] = useState(-1)
@@ -113,13 +229,16 @@ export default function ExperienceSection() {
     const scrollDistance = Math.max(scene.offsetHeight - window.innerHeight, 0)
     window.clearTimeout(focusTimerRef.current)
     setFocusedIndex(-1)
-    scrollToPagePosition(scene.offsetTop + scrollDistance * progress, {
+    const targetTop = scene.offsetTop + scrollDistance * progress
+    scrollToPagePosition(targetTop, {
       onComplete: () => {
         setFocusedIndex(index)
         focusTimerRef.current = window.setTimeout(() => setFocusedIndex(-1), 600)
       },
     })
   }, [])
+
+  if (isMobile) return <MobileExperienceSection />
 
   return (
     <ScrollScene
@@ -136,35 +255,7 @@ export default function ExperienceSection() {
           <span className="experience-heading__secondary mono">/ EXPERIENCE</span>
         </h2>
 
-        <nav className="experience-timeline" data-experience-timeline aria-label="按年份选择工作经历">
-          <span className="experience-timeline__line" aria-hidden="true">
-            <span className="experience-timeline__line-progress" />
-          </span>
-          <ol>
-            {EXPERIENCES.map((experience, index) => (
-              <li key={experience.year} style={{ '--node-threshold': index / (EXPERIENCES.length - 1) }}>
-                <button
-                  className="experience-timeline__node"
-                  data-hovered={hoveredIndex === index || undefined}
-                  onClick={() => handleNodeClick(index)}
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(-1)}
-                  onPointerMove={() => setHoveredIndex(index)}
-                  type="button"
-                  aria-label={`查看 ${experience.year} 年 ${experience.company} 工作经历`}
-                >
-                  <span className="experience-timeline__year">
-                    <span>{experience.year}</span>
-                    <span className="experience-timeline__year-active" aria-hidden="true">{experience.year}</span>
-                  </span>
-                  <span className="experience-timeline__dot" aria-hidden="true">
-                    <span />
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <ExperienceTimeline hoveredIndex={hoveredIndex} onHover={setHoveredIndex} onSelect={handleNodeClick} />
 
         <div className="experience-content">
           <div className="experience-track">

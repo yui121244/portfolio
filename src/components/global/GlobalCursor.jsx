@@ -1,7 +1,11 @@
 import { Canvas } from '@react-three/fiber'
 import PointerRig from '../scene/PointerRig'
+import { useMobileLayout } from '../../lib/useMobileLayout'
 
 export default function GlobalCursor({ backgroundProgressRef, visible }) {
+  const isMobile = useMobileLayout()
+  if (isMobile) return null
+
   return (
     <div className="global-cursor" aria-hidden="true">
       <Canvas

@@ -12,6 +12,7 @@ npm run dev
 ```
 
 本地生产预览：`npm run build`，然后 `npm run preview`。
+本地地址需带 `/portfolio/`：开发时如 `http://127.0.0.1:5173/portfolio/`，生产预览时如 `http://127.0.0.1:4173/portfolio/`（端口以终端输出为准）。
 
 ## GitHub Pages
 
@@ -22,7 +23,7 @@ npm run dev
 
 `npm run build:pages` 将发布文件生成至 `dist-pages/`，使用 `/portfolio/` 资源路径。
 构建同时生成五个项目入口，保证 `/portfolio/projects/1/` 至 `/portfolio/projects/5/` 可直接访问和刷新。
-本地默认构建仍使用根路径，保持原有预览地址可用。
+本地开发、默认构建与线上发布统一使用 `/portfolio/`，与仓库中的 `base` 配置保持一致。
 
 ## 更新资源
 

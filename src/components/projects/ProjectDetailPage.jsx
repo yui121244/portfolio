@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import DocumentPreviewModal from '../global/DocumentPreviewModal'
 import GlobalChrome from '../global/GlobalChrome'
 import GlobalCursor from '../global/GlobalCursor'
+import ProjectCard from './ProjectCard'
+import { useMobileLayout } from '../../lib/useMobileLayout'
 import { ENTRANCE_PHASE } from '../../lib/entranceTimeline'
 import { projectHref, SITE_BASE } from '../../lib/sitePaths'
 import {
@@ -231,6 +233,7 @@ function ProjectSwitcher({ currentProjectId, placement }) {
 export default function ProjectDetailPage({ project }) {
   const [activeSection, setActiveSection] = useState('project-section-1')
   const [activePresentation, setActivePresentation] = useState(null)
+  const [navigationOpen, setNavigationOpen] = useState(false)
   const cursorBackgroundRef = useRef(1)
   const detailModel = useMemo(() => createDetailModel(project), [project])
   const { groups, navigation } = detailModel
@@ -239,6 +242,7 @@ export default function ProjectDetailPage({ project }) {
     document.title = `${project.name} — PENGYANG.DESIGN`
     setActiveSection(groups.find((group) => !group.isIntro)?.id ?? '')
     setActivePresentation(null)
+    setNavigationOpen(false)
     window.scrollTo(0, 0)
 
     const sections = [...document.querySelectorAll('[data-project-detail-section]')]
@@ -258,7 +262,9 @@ export default function ProjectDetailPage({ project }) {
     if (!target) return
     event.preventDefault()
     setActiveSection(sectionId)
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setNavigationOpen(false)
+    // Wait for the mobile contents panel to collapse before measuring the anchor.
+    window.requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     window.history.replaceState(null, '', `#${sectionId}`)
   }
 
@@ -282,13 +288,28 @@ export default function ProjectDetailPage({ project }) {
         </header>
 
         <div className="project-detail-layout">
-          <aside className="project-detail-tabs" aria-label="项目内容导航">
-            <ProjectDetailNavigation
-              activeSection={activeSection}
-              items={navigation}
-              onAnchor={handleAnchor}
-              onPresentation={setActivePresentation}
-            />
+          <aside className="project-detail-tabs" aria-label="项目内容导航" data-open={navigationOpen}>
+            <button
+              aria-controls="project-detail-contents"
+              aria-expanded={navigationOpen}
+              className="project-detail-tabs__toggle"
+              onClick={() => setNavigationOpen(open => !open)}
+              type="button"
+            >
+              <span>项目目录</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5" /></svg>
+            </button>
+            <div className="project-detail-tabs__contents" id="project-detail-contents">
+              <ProjectDetailNavigation
+                activeSection={activeSection}
+                items={navigation}
+                onAnchor={handleAnchor}
+                onPresentation={(document) => {
+                  setNavigationOpen(false)
+                  setActivePresentation(document)
+                }}
+              />
+            </div>
           </aside>
 
           <div className="project-detail-content">
@@ -318,12 +339,28 @@ export default function ProjectDetailPage({ project }) {
           </div>
 
           <footer className="project-detail-footer">
-            <ProjectSwitcher currentProjectId={project.id} placement="footer" />
+            <RelatedProjects currentProjectId={project.id} />
           </footer>
         </div>
       </main>
 
       <PresentationModal document={activePresentation} onClose={() => setActivePresentation(null)} />
     </div>
+  )
+}
+
+function RelatedProjects({ currentProjectId }) {
+  const isMobile = useMobileLayout()
+  if (!isMobile) return <ProjectSwitcher currentProjectId={currentProjectId} placement="footer" />
+
+  return (
+    <nav aria-label="更多项目" className="project-detail-related">
+      <h2>更多项目</h2>
+      <div className="projects-grid">
+        {PROJECTS.filter(project => project.id !== currentProjectId).map(project => (
+          <ProjectCard index={project.id - 1} key={project.id} project={project} />
+        ))}
+      </div>
+    </nav>
   )
 }

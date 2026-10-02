@@ -25,7 +25,10 @@ export function useScrollNarrative() {
 
     const update = ({ scroll = window.scrollY } = {}, immediateScene = false) => {
       const viewportHeight = Math.max(window.innerHeight, 1)
-      const heroProgress = scroll / viewportHeight
+      const heroHeight = window.matchMedia('(max-width: 900px)').matches
+        ? document.getElementById('top')?.offsetHeight || viewportHeight
+        : viewportHeight
+      const heroProgress = scroll / heroHeight
       const transitionProgress = smoothStep(
         (heroProgress - TRANSITION_START) / (TRANSITION_END - TRANSITION_START),
       )
