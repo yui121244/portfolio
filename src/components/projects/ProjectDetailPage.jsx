@@ -88,24 +88,18 @@ function createDetailModel(project) {
   }
 }
 
-function ProjectMedia({ item, index, projectId, projectName }) {
+function ProjectMedia({ item, index, projectName }) {
   if (item.type === 'video') {
-    const mediaNumber = Number.parseInt(item.filename, 10)
-    const isSilent = (
-      // Muting allows project 01 demos to autoplay without a browser gesture.
-      projectId === 1
-      || (projectId === 3 && [2, 8, 9, 16, 17].includes(mediaNumber))
-      || (projectId === 4 && mediaNumber === 11)
-    )
-
+    // All current and future project videos share the same autoplay policy.
+    // Muted inline playback works without requiring a play-button gesture.
     return (
       <figure className="project-detail-media project-detail-media--video" data-project-media={item.filename}>
         <video
           aria-label={`${projectName} 项目视频 ${index + 1}`}
-          autoPlay={isSilent}
+          autoPlay
           controls
           loop
-          muted={isSilent}
+          muted
           playsInline
           preload="metadata"
           src={item.src}
@@ -329,7 +323,6 @@ export default function ProjectDetailPage({ project }) {
                       index={currentIndex}
                       item={item}
                       key={item.filename}
-                      projectId={project.id}
                       projectName={project.name}
                     />
                   )
